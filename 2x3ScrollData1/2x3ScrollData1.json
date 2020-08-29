@@ -1,0 +1,126 @@
+{
+    "comment": "What it does:",
+    "comment": "  - 2x3-character scroll with color fonts",
+    "comment": "  - fonts come from several separate input font sets",
+    "comment": "  - does not use font sets identifiers to switch font sets, since it is not necessary here",
+    "comment": "  - uses 'consolidation' parameter in order to store upper, middle and lower parts of fonts separately",
+
+    "comment": "You can use font sets identifiers defined in 'fonts', and tags identifiers defined in 'lookups'.",
+    "comment": "It is not required to switch font sets in all cases, because 'Scroll Packer' is sometimes",
+    "comment": "able to do the best matching for you. You need to switch font set in ambiguous situations only.",
+    "comment": "'Scroll Packer' first searches for tags in active font set and active font set with 'or' (set_or),",
+    "comment": "then in default font set (set_default), and finally in others font sets.",
+    "scroll": [
+        " HEY GUYS! IT'S THE DEMO OF SCROLL PACKER... [Atari left][Atari right] IS THE BEST! ",
+        "WE [heart left][heart right] YOU! ",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        ".,:!?'    "
+    ],
+
+    "comment": "'width', 'height': how many characters of width and height fonts have",
+    "comment": "'begin': min. value of bytes in scroll text data",
+    "comment": "'zero': an optional parameter indicating if to add zero at the end of scroll text data",
+    "comment": "'language': C or Assembler",
+    "comment": "'format': hex or dec",
+    "comment": "'consolidation': false (usually used when each row is a different charset switched in DLI routine) or",
+    "comment": "                  true (places all parts of WIDTHxHEIGHT-characters one by one in output array)",
+    "comment": "                 ('consolidation' is not important when 'height' equals to 1)",
+    "comment": "'text_org': an optional Assembler's ORG directive for scroll text data",
+    "comment": "'fonts_org': optional Assembler's ORG directives for fonts data (consolidated or in parts)",
+    "parameters": {
+        "width": 2,
+        "height": 3,
+        "begin": 0,
+        "language": "Assembler",
+        "format": "hex",
+        "consolidation": false,
+        "text_org": "\torg $900\n",
+        "fonts_org": ["\torg $7000\n", "\torg $8000\n", "\torg $9000\n"]
+    },
+
+    "comment": "'set': can be any string, unique within sets of 'fonts' and tags of 'lookups'",
+    "comment": "'set_default': an optional parameter that defines identifier used to switch of default font set",
+    "comment": "'set_or': an optional parameter that defines identifier used to turn bitwise OR on",
+    "comment": "'file': the filename of a file containing fonts definitions",
+    "comment": "'lookup': the name of a lookup defined in 'lookups'",
+    "fonts": [
+        { "set": "{uppercaseA-P}",
+          "file": "Fonts\\colorFonts2x3UppercaseLettersA-P.fnt",
+          "lookup": "colorFonts2x3UppercaseLettersA-PLookup"
+        },
+        { "set": "{uppercaseQ-Z}",
+          "file": "Fonts\\colorFonts2x3UppercaseLettersQ-Z.fnt",
+          "lookup": "colorFonts2x3UppercaseLettersQ-ZLookup"
+        },
+        { "set": "{special}",
+          "file": "Fonts\\colorFonts2x3SpecialCharacters.fnt",
+          "lookup": "colorFonts2x3SpecialCharactersLookup"
+        }
+    ],
+
+    "comment": "'tag': can be any string, unique within sets of 'fonts' and tags of particular 'lookup'",
+    "comment": "'offsets': offsets of parts of font in fonts data, in 8-bytes chunks",
+    "comment": "  for WxH-character fonts 'offsets': [  offset_0_0_part,   offset_1_0_part, ...,   offset_W-1_0_part, ",
+    "comment": "                                        offset_0_1_part,   offset_1_1_part, ...,   offset_W-1_1_part, ",
+    "comment": "                                                                            ...                       ",
+    "comment": "                                      offset_0_H-1_part, offset_1_H-1_part, ..., offset_W-1_H-1_part] ",
+    "comment": "",
+    "comment": "  e.g. for 2x2-character fonts 'offsets': [offset_upper_left_part, offset_upper_right_part,  ",
+    "comment": "                                           offset_lower_left_part, offset_lower_right_part]  ",
+    "comment": "",
+    "comment": "  e.g. for 1x1-character fonts 'offsets': [offset] ",
+    "comment": "'or': an optional parameter which value is used to perform bitwise disjunction (bitwise OR) with",
+    "comment": "      appropriate byte of scroll text data",
+    "comment": "      (it somehow can be used for getting inverse characters)",
+    "lookups": [
+        { "lookup": "colorFonts2x3UppercaseLettersA-PLookup",
+          "mapping": [
+              { "tag": "A",  "offsets": [  0,   1,  32,  33,  64,  65 ] },
+              { "tag": "B",  "offsets": [  2,   3,  34,  35,  66,  67 ] },
+              { "tag": "C",  "offsets": [  4,   5,  36,  37,  68,  69 ] },
+              { "tag": "D",  "offsets": [  6,   7,  38,  39,  70,  71 ] },
+              { "tag": "E",  "offsets": [  8,   9,  40,  41,  72,  73 ] },
+              { "tag": "F",  "offsets": [ 10,  11,  42,  43,  74,  75 ] },
+              { "tag": "G",  "offsets": [ 12,  13,  44,  45,  76,  77 ] },
+              { "tag": "H",  "offsets": [ 14,  15,  46,  47,  78,  79 ] },
+              { "tag": "I",  "offsets": [ 16,  17,  48,  49,  80,  81 ] },
+              { "tag": "J",  "offsets": [ 18,  19,  50,  51,  82,  83 ] },
+              { "tag": "K",  "offsets": [ 20,  21,  52,  53,  84,  85 ] },
+              { "tag": "L",  "offsets": [ 22,  23,  54,  55,  86,  87 ] },
+              { "tag": "M",  "offsets": [ 24,  25,  56,  57,  88,  89 ] },
+              { "tag": "N",  "offsets": [ 26,  27,  58,  59,  90,  91 ] },
+              { "tag": "O",  "offsets": [ 28,  29,  60,  61,  92,  93 ] },
+              { "tag": "P",  "offsets": [ 30,  31,  62,  63,  94,  95 ] }
+          ]
+        },
+        { "lookup": "colorFonts2x3UppercaseLettersQ-ZLookup",
+          "mapping": [
+              { "tag": "Q",  "offsets": [  0,   1,  32,  33,  64,  65 ] },
+              { "tag": "R",  "offsets": [  2,   3,  34,  35,  66,  67 ] },
+              { "tag": "S",  "offsets": [  4,   5,  36,  37,  68,  69 ] },
+              { "tag": "T",  "offsets": [  6,   7,  38,  39,  70,  71 ] },
+              { "tag": "U",  "offsets": [  8,   9,  40,  41,  72,  73 ] },
+              { "tag": "V",  "offsets": [ 10,  11,  42,  43,  74,  75 ] },
+              { "tag": "W",  "offsets": [ 12,  13,  44,  45,  76,  77 ] },
+              { "tag": "X",  "offsets": [ 14,  15,  46,  47,  78,  79 ] },
+              { "tag": "Y",  "offsets": [ 16,  17,  48,  49,  80,  81 ] },
+              { "tag": "Z",  "offsets": [ 18,  19,  50,  51,  82,  83 ] },
+              { "tag": " ",  "offsets": [ 20,  20,  20,  20,  20,  20 ] }
+          ]
+        },
+        { "lookup": "colorFonts2x3SpecialCharactersLookup",
+          "mapping": [
+              { "tag": ".",  "offsets": [  0,   1,  32,  33,  64,  65 ] },
+              { "tag": ",",  "offsets": [  2,   3,  34,  35,  66,  67 ] },
+              { "tag": ":",  "offsets": [  4,   5,  36,  37,  68,  69 ] },
+              { "tag": "!",  "offsets": [  6,   7,  38,  39,  70,  71 ] },
+              { "tag": "?",  "offsets": [  8,   9,  40,  41,  72,  73 ] },
+              { "tag": "[heart left]",  "offsets": [  10,   11,  42,  43,  74,  75 ], "comment": " heart, left part " },
+              { "tag": "[heart right]",  "offsets": [  12,   13,  44,  45,  76,  77 ], "comment": " heart, right part " },
+              { "tag": "[Atari left]",  "offsets": [  14,   15,  46,  47,  78,  79 ], "comment": " Atari logo, left part " },
+              { "tag": "[Atari right]",  "offsets": [  16,   17,  48,  49,  80,  81 ], "comment": " Atari logo, right part " },
+              { "tag": "'",  "offsets": [  18,   19,  50,  51,  82,  83 ] }
+          ]
+        }
+    ]
+}
