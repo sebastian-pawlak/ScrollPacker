@@ -1,0 +1,639 @@
+mads 2.0.6 build 58 (28 Jan 17)
+     1 				; "2x2 scroll, example 3", Atari XL/XE Intro
+     2 				;
+     3 				; what it does:
+     4 				; - 2x2-character scroll in ANTIC mode 4 (4 colors + background)
+     5 				; - supports up to 128 unique color 2x2-fonts
+     6 				; - fonts come from several separate input font sets
+     7 				; - length of scroll is limited by available memory only
+     8 				;
+     9 				; code by tr1x / Agenda
+    10 				; requirements: original Atari XL/XE 64KB PAL
+    11 				; version: 1.0
+    12 				; date: 2020-06-10
+    13
+    14 = 4000			video1	equ $4000
+    15 = 4040			video2	equ $4040
+    16 = 8000			charset	equ $8000
+    17
+    18 = 0012			rtclok	equ $0012
+    19 = 00C0			txtptr	equ $00c0
+    20 = 00C2			srcaddr	equ $00c2
+    21 = 00C4			dstaddr	equ $00c4
+    22 = 00C6			chcntr	equ $00c6
+    23 = 0200			vdslst	equ $0200
+    24 = 0230			sdlstl	equ $0230
+    25 = 02C4			color0	equ $02c4
+    26 = 02C5			color1	equ $02c5
+    27 = 02C6			color2	equ $02c6
+    28 = 02C7			color3	equ $02c7
+    29 = 02F4			chbas	equ $02f4
+    30 = D404			hscrol	equ $d404
+    31 = D409			chbase	equ $d409
+    32 = D40A			wsync	equ $d40a
+    33 = D40B			vcount	equ $d40b
+    34 = D40E			nmien	equ $d40e
+    35 = FFFA			nmivec	equ $fffa
+    36
+    37 					org $600
+    38
+    39 					; set display list
+    40 FFFF> 0600-06E2> A9 D7		lda #<dlist
+    41 0602 8D 30 02			sta sdlstl
+    42 0605 A9 06			lda #>dlist
+    43 0607 8D 31 02			sta sdlstl+1
+    44
+    45 					; set colors
+    46 060A A9 88			lda #$88
+    47 060C 8D C4 02			sta color0
+    48 060F A9 86			lda #$86
+    49 0611 8D C6 02			sta color2
+    50 0614 A9 84			lda #$84
+    51 0616 8D C5 02			sta color1
+    52 0619 A9 82			lda #$82
+    53 061B 8D C7 02			sta color3
+    54
+    55 					; initialize text pointer to the first character of scroll text
+    56 061E A9 00			lda <text
+    57 0620 85 C0			sta txtptr
+    58 0622 A9 09			lda >text
+    59 0624 85 C1			sta txtptr+1
+    60
+    61 					; set character set
+    62 0626 A9 80			lda #>charset
+    63 0628 8D F4 02			sta chbas
+    64
+    65 062B A9 04			lda #$04
+    66 062D 85 C6			sta chcntr
+    67
+    68 062F A2 07			ldx #$07
+    69 0631 8E 04 D4		main	stx hscrol
+    70
+    71 					; delay
+    72 0634 A5 14			lda rtclok+2
+    73 0636 C5 14		delay	cmp rtclok+2
+    74 0638 F0 FC			beq delay
+    75
+    76 063A CA				dex
+    77 063B 10 F4			bpl main
+    78 063D A2 07			ldx #$07
+    79 063F 8E 04 D4			stx hscrol
+    80
+    81 					; source address of character look data
+    82 0642 A9 00			lda #$00
+    83 0644 85 C3			sta srcaddr+1
+    84 0646 A0 00			ldy #$00
+    85 0648 B1 C0			lda (txtptr),y
+    86 064A 0A				asl
+    87 064B 26 C3			rol srcaddr+1
+    88 064D 0A				asl
+    89 064E 26 C3			rol srcaddr+1
+    90 0650 0A				asl
+    91 0651 26 C3			rol srcaddr+1
+    92 0653 0A				asl
+    93 0654 26 C3			rol srcaddr+1
+    94 0656 0A				asl
+    95 0657 26 C3			rol srcaddr+1
+    96 0659 85 C2			sta srcaddr
+    97
+    98 065B A9 00			lda #<fonts
+    99 065D 18				clc
+   100 065E 65 C2			adc srcaddr
+   101 0660 85 C2			sta srcaddr
+   102 0662 A9 70			lda #>fonts
+   103 0664 65 C3			adc srcaddr+1
+   104 0666 85 C3			sta srcaddr+1
+   105
+   106 					; destination address to copy character look data to
+   107 					; (it can be optimized at least a little bit)
+   108 0668 A9 00			lda #$00
+   109 066A 85 C5			sta dstaddr+1
+   110 066C AD 2C 40			lda video1+$2c
+   111 066F 0A				asl
+   112 0670 26 C5			rol dstaddr+1
+   113 0672 0A				asl
+   114 0673 26 C5			rol dstaddr+1
+   115 0675 0A				asl
+   116 0676 26 C5			rol dstaddr+1
+   117 0678 85 C4			sta dstaddr
+   118
+   119 067A A9 80			lda #>charset
+   120 067C 18				clc
+   121 067D 65 C5			adc dstaddr+1
+   122 067F 85 C5			sta dstaddr+1
+   123
+   124 					; copy 32 bytes of character look data from source to destination
+   125 0681 A0 20			ldy #$20
+   126 0683 B1 C2		loop	lda (srcaddr),y
+   127 0685 91 C4			sta (dstaddr),y
+   128 0687 88				dey
+   129 0688 10 F9			bpl loop
+   130
+   131 					; move data in viewport two characters left
+   132 068A A0 00			ldy #$00
+   133 068C B9 02 40		move	lda video1+2,y
+   134 068F 99 00 40			sta video1,y
+   135 0692 B9 42 40			lda video2+2,y
+   136 0695 99 40 40			sta video2,y
+   137 0698 C8				iny
+   138 0699 C0 2C			cpy #$2c
+   139 069B D0 EF			bne move
+   140
+   141 					; put new spare characters
+   142 069D A5 C6			lda chcntr
+   143 069F 8D 2C 40			sta video1+$2c
+   144 06A2 18				clc
+   145 06A3 69 01			adc #$01
+   146 06A5 8D 2D 40			sta video1+$2d
+   147 06A8 69 01			adc #$01
+   148 06AA 09 80			ora #$80
+   149 06AC 8D 6C 40			sta video2+$2c
+   150 06AF 69 01			adc #$01
+   151 06B1 8D 6D 40			sta video2+$2d
+   152 06B4 69 01			adc #$01
+   153 06B6 29 7F			and #$7f
+   154 06B8 85 C6			sta chcntr
+   155
+   156 					; point to the next character of scroll text
+   157 06BA E6 C0			inc txtptr
+   158 06BC D0 02			bne skip1
+   159 06BE E6 C1			inc txtptr+1
+   160 06C0			skip1
+   161
+   162 					; check if it is the end of scroll text
+   163 06C0 A5 C0			lda txtptr
+   164 06C2 C9 C2			cmp #<textend
+   165 06C4 D0 0E			bne skip2
+   166 06C6 A5 C1			lda txtptr+1
+   167 06C8 C9 09			cmp #>textend
+   168 06CA D0 08			bne skip2
+   169
+   170 					; initialize text pointer to the first character of scroll text
+   171 06CC A9 00			lda <text
+   172 06CE 85 C0			sta txtptr
+   173 06D0 A9 09			lda >text
+   174 06D2 85 C1			sta txtptr+1
+   175
+   176 06D4 4C 31 06		skip2	jmp main
+   177
+   178
+   179 					; display list
+   180 06D7 70 70 70		dlist	.byte $70, $70, $70		; 24 blank lines
+   181 06DA 54				.byte $04 | $40 | $10		; mode 4 + LMS + HSCROLL
+   182 06DB 00 40			.byte $00, $40			; screen address
+   183 06DD 54				.byte $04 | $40 | $10		; mode 4 + LMS + HSCROLL
+   184 06DE 40 40			.byte $40, $40			; screen address
+   185 06E0 41				.byte $41			; jump and wait for VBLANK
+   186 06E1 D7 06			.byte <dlist, >dlist		; jump to this address
+   187
+   188
+   189 					; data comes from "2x2ScrollData3.json"
+   190 06E3				icl '2X2DTA3.ASM'
+     1 				; "Scroll Packer" v0.1, 2020-07-16 22:28:43, "2x2ScrollData3\2x2ScrollData3.json"
+     2
+     3 06E3				org $900
+     4
+     5 				; scroll text, length: 194, unique characters: 103
+     6 0900-09C1> 00 01 02 03 + text	.byte $00, $01, $02, $03, $00, $04, $05, $03	;  Hey guy
+     7 0908 06 07 00 08 09 0A + 	.byte $06, $07, $00, $08, $09, $0a, $06, $00	; s! It's 
+     8 0910 09 0B 02 00 0C 02 + 	.byte $09, $0b, $02, $00, $0c, $02, $0d, $0e	; the demo
+     9 0918 00 0E 0F 00 10 11 + 	.byte $00, $0e, $0f, $00, $10, $11, $12, $13	;  of SCRO
+    10 0920 14 14 00 15 16 11 + 	.byte $14, $14, $00, $15, $16, $11, $17, $18	; LL PACKE
+    11 0928 12 19 00 1A 1B 00 + 	.byte $12, $19, $00, $1a, $1b, $00, $08, $10	; R[...] [Atari left][Atari right] IS
+    12 0930 00 1C 01 18 00 1D + 	.byte $00, $1c, $01, $18, $00, $1d, $18, $10	;  THE BES
+    13 0938 1C 07 00 1E 02 00 + 	.byte $1c, $07, $00, $1e, $02, $00, $1f, $00	; T! We [heart] 
+    14 0940 03 0E 05 07 00 20 + 	.byte $03, $0e, $05, $07, $00, $20, $21, $02	; you! Gże
+    15 0948 04 21 22 23 24 25 + 	.byte $04, $21, $22, $23, $24, $25, $00, $20	; gżółka G
+    16 0950 26 18 20 26 27 28 + 	.byte $26, $18, $20, $26, $27, $28, $17, $16	; ŻEGŻÓŁKA
+    17 0958 00 00 00 16 1D 11 + 	.byte $00, $00, $00, $16, $1d, $11, $29, $18	;    ABCDE
+    18 0960 2A 20 01 08 2B 17 + 	.byte $2a, $20, $01, $08, $2b, $17, $14, $2c	; FGHIJKLM
+    19 0968 2D 13 15 2E 12 10 + 	.byte $2d, $13, $15, $2e, $12, $10, $1c, $2f	; NOPQRSTU
+    20 0970 30 1E 31 32 33 25 + 	.byte $30, $1e, $31, $32, $33, $25, $34, $35	; VWXYZabc
+    21 0978 0C 02 0F 04 0B 36 + 	.byte $0c, $02, $0f, $04, $0b, $36, $37, $24	; defghijk
+    22 0980 38 0D 39 0E 3A 3B + 	.byte $38, $0d, $39, $0e, $3a, $3b, $3c, $06	; lmnopqrs
+    23 0988 09 05 3D 3E 3F 03 + 	.byte $09, $05, $3d, $3e, $3f, $03, $40, $41	; tuvwxyz0
+    24 0990 42 43 44 45 46 47 + 	.byte $42, $43, $44, $45, $46, $47, $48, $49	; 12345678
+    25 0998 4A 4B 4C 4D 28 4E + 	.byte $4a, $4b, $4c, $4d, $28, $4e, $27, $4f	; 9ĄĆĘŁŃÓŚ
+    26 09A0 50 26 51 52 53 54 + 	.byte $50, $26, $51, $52, $53, $54, $22, $55	; ŹŻąćęńóś
+    27 09A8 56 21 57 58 59 5A + 	.byte $56, $21, $57, $58, $59, $5a, $07, $5b	; źż.,:_!?
+    28 09B0 5C 5D 0A 5E 5F 60 + 	.byte $5c, $5d, $0a, $5e, $5f, $60, $61, $62	; \/'()%&+
+    29 09B8 63 64 00 65 00 66 + 	.byte $63, $64, $00, $65, $00, $66, $00, $00	; -= [happy face] [sad face]  
+    30 09C0 00 00			.byte $00, $00	;   
+    31 09C2			textend
+    32
+    33 09C2				org $7000
+    34
+    35 				; fonts data
+    36 7000-7CDF> 00 00 00 00 + fonts	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {uppercase} 0_0
+    37 7008 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {uppercase} 1_0
+    38 7010 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {uppercase} 0_1
+    39 7018 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {uppercase} 1_1
+    40 7020 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $aa	; "H" {uppercase} 0_0
+    41 7028 04 04 04 0C 0C 0C + 	.byte $04, $04, $04, $0c, $0c, $0c, $0c, $a8	; "H" {uppercase} 1_0
+    42 7030 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "H" {uppercase} 0_1
+    43 7038 08 08 08 0C 0C 0C + 	.byte $08, $08, $08, $0c, $0c, $0c, $0c, $00	; "H" {uppercase} 1_1
+    44 7040 00 00 00 03 0C 30 + 	.byte $00, $00, $00, $03, $0c, $30, $f0, $a0	; "e" {lowercase} 0_0
+    45 7048 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $08	; "e" {lowercase} 1_0
+    46 7050 AA A0 A0 F0 30 0C + 	.byte $aa, $a0, $a0, $f0, $30, $0c, $03, $00	; "e" {lowercase} 0_1
+    47 7058 A0 00 00 00 0C 30 + 	.byte $a0, $00, $00, $00, $0c, $30, $c0, $00	; "e" {lowercase} 1_1
+    48 7060 00 00 00 C0 C0 C0 + 	.byte $00, $00, $00, $c0, $c0, $c0, $c0, $80	; "y" {lowercase} 0_0
+    49 7068 00 00 00 3C 3C 3C + 	.byte $00, $00, $00, $3c, $3c, $3c, $3c, $28	; "y" {lowercase} 1_0
+    50 7070 20 20 0A 00 00 30 + 	.byte $20, $20, $0a, $00, $00, $30, $0f, $00	; "y" {lowercase} 0_1
+    51 7078 28 28 A8 3C 3C 30 + 	.byte $28, $28, $a8, $3c, $3c, $30, $c0, $00	; "y" {lowercase} 1_1
+    52 7080 00 00 00 0F 30 C0 + 	.byte $00, $00, $00, $0f, $30, $c0, $c0, $80	; "g" {lowercase} 0_0
+    53 7088 00 00 00 00 C0 30 + 	.byte $00, $00, $00, $00, $c0, $30, $3c, $28	; "g" {lowercase} 1_0
+    54 7090 80 20 0A 00 00 30 + 	.byte $80, $20, $0a, $00, $00, $30, $0f, $00	; "g" {lowercase} 0_1
+    55 7098 28 28 A8 3C 3C 30 + 	.byte $28, $28, $a8, $3c, $3c, $30, $c0, $00	; "g" {lowercase} 1_1
+    56 70A0 00 00 00 F0 F0 F0 + 	.byte $00, $00, $00, $f0, $f0, $f0, $f0, $a0	; "u" {lowercase} 0_0
+    57 70A8 00 00 00 0C 0C 0C + 	.byte $00, $00, $00, $0c, $0c, $0c, $0c, $08	; "u" {lowercase} 1_0
+    58 70B0 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "u" {lowercase} 0_1
+    59 70B8 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "u" {lowercase} 1_1
+    60 70C0 00 00 00 0F 30 F0 + 	.byte $00, $00, $00, $0f, $30, $f0, $f0, $a0	; "s" {lowercase} 0_0
+    61 70C8 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $00	; "s" {lowercase} 1_0
+    62 70D0 20 0A 00 00 C0 30 + 	.byte $20, $0a, $00, $00, $c0, $30, $0f, $00	; "s" {lowercase} 0_1
+    63 70D8 00 80 20 0C 0C 30 + 	.byte $00, $80, $20, $0c, $0c, $30, $c0, $00	; "s" {lowercase} 1_1
+    64 70E0 05 05 05 0F 0F 0F + 	.byte $05, $05, $05, $0f, $0f, $0f, $0f, $0a	; "!" {specialcharacters} 0_0
+    65 70E8 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "!" {specialcharacters} 1_0
+    66 70F0 0A 0A 00 00 0F 0F + 	.byte $0a, $0a, $00, $00, $0f, $0f, $0f, $00	; "!" {specialcharacters} 0_1
+    67 70F8 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "!" {specialcharacters} 1_1
+    68 7100 05 01 01 03 03 03 + 	.byte $05, $01, $01, $03, $03, $03, $03, $02	; "I" {uppercase} 0_0
+    69 7108 50 40 40 C0 C0 C0 + 	.byte $50, $40, $40, $c0, $c0, $c0, $c0, $80	; "I" {uppercase} 1_0
+    70 7110 02 02 02 03 03 03 + 	.byte $02, $02, $02, $03, $03, $03, $0f, $00	; "I" {uppercase} 0_1
+    71 7118 80 80 80 C0 C0 C0 + 	.byte $80, $80, $80, $c0, $c0, $c0, $f0, $00	; "I" {uppercase} 1_1
+    72 7120 01 01 01 3F 03 03 + 	.byte $01, $01, $01, $3f, $03, $03, $03, $02	; "t" {lowercase} 0_0
+    73 7128 40 40 40 FC C0 C0 + 	.byte $40, $40, $40, $fc, $c0, $c0, $c0, $80	; "t" {lowercase} 1_0
+    74 7130 02 02 02 03 03 00 + 	.byte $02, $02, $02, $03, $03, $00, $00, $00	; "t" {lowercase} 0_1
+    75 7138 80 80 80 C0 CC CC + 	.byte $80, $80, $80, $c0, $cc, $cc, $30, $00	; "t" {lowercase} 1_1
+    76 7140 01 01 01 03 03 00 + 	.byte $01, $01, $01, $03, $03, $00, $00, $00	; "'" {specialcharacters} 0_0
+    77 7148 40 40 40 C0 C0 00 + 	.byte $40, $40, $40, $c0, $c0, $00, $00, $00	; "'" {specialcharacters} 1_0
+    78 7150 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "'" {specialcharacters} 0_1
+    79 7158 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "'" {specialcharacters} 1_1
+    80 7160 50 50 50 F3 FC F0 + 	.byte $50, $50, $50, $f3, $fc, $f0, $f0, $a0	; "h" {lowercase} 0_0
+    81 7168 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $08	; "h" {lowercase} 1_0
+    82 7170 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "h" {lowercase} 0_1
+    83 7178 08 08 08 0C 0C 0C + 	.byte $08, $08, $08, $0c, $0c, $0c, $0c, $00	; "h" {lowercase} 1_1
+    84 7180 00 00 00 0F 30 C0 + 	.byte $00, $00, $00, $0f, $30, $c0, $c0, $80	; "d" {lowercase} 0_0
+    85 7188 14 14 14 3C FC 3C + 	.byte $14, $14, $14, $3c, $fc, $3c, $3c, $28	; "d" {lowercase} 1_0
+    86 7190 C0 C0 C0 C0 C0 30 + 	.byte $c0, $c0, $c0, $c0, $c0, $30, $0f, $00	; "d" {lowercase} 0_1
+    87 7198 28 28 28 3C 3C FC + 	.byte $28, $28, $28, $3c, $3c, $fc, $3c, $00	; "d" {lowercase} 1_1
+    88 71A0 00 00 00 F0 F0 FC + 	.byte $00, $00, $00, $f0, $f0, $fc, $fc, $a2	; "m" {lowercase} 0_0
+    89 71A8 00 00 00 0C 0C 3C + 	.byte $00, $00, $00, $0c, $0c, $3c, $3c, $88	; "m" {lowercase} 1_0
+    90 71B0 A2 A0 A0 F0 F0 F0 + 	.byte $a2, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "m" {lowercase} 0_1
+    91 71B8 88 08 08 0C 0C 0C + 	.byte $88, $08, $08, $0c, $0c, $0c, $0c, $00	; "m" {lowercase} 1_1
+    92 71C0 00 00 00 03 0C 30 + 	.byte $00, $00, $00, $03, $0c, $30, $f0, $a0	; "o" {lowercase} 0_0
+    93 71C8 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $08	; "o" {lowercase} 1_0
+    94 71D0 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "o" {lowercase} 0_1
+    95 71D8 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "o" {lowercase} 1_1
+    96 71E0 00 01 05 0F 0F 0F + 	.byte $00, $01, $05, $0f, $0f, $0f, $0f, $0a	; "f" {lowercase} 0_0
+    97 71E8 50 00 00 00 00 00 + 	.byte $50, $00, $00, $00, $00, $00, $00, $00	; "f" {lowercase} 1_0
+    98 71F0 AA 0A 0A 0F 0F 0F + 	.byte $aa, $0a, $0a, $0f, $0f, $0f, $0f, $00	; "f" {lowercase} 0_1
+    99 71F8 A0 00 00 00 00 00 + 	.byte $a0, $00, $00, $00, $00, $00, $00, $00	; "f" {lowercase} 1_1
+   100 7200 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $30, $08	; "S" {uppercase} 0_0
+   101 7208 40 10 04 0C 00 00 + 	.byte $40, $10, $04, $0c, $00, $00, $00, $00	; "S" {uppercase} 1_0
+   102 7210 02 00 00 00 C0 30 + 	.byte $02, $00, $00, $00, $c0, $30, $0f, $00	; "S" {uppercase} 0_1
+   103 7218 80 20 08 0C 0C 30 + 	.byte $80, $20, $08, $0c, $0c, $30, $c0, $00	; "S" {uppercase} 1_1
+   104 7220 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $a0	; "C" {uppercase} 0_0
+   105 7228 40 10 04 0C 00 00 + 	.byte $40, $10, $04, $0c, $00, $00, $00, $00	; "C" {uppercase} 1_0
+   106 7230 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "C" {uppercase} 0_1
+   107 7238 00 00 00 0C 0C 30 + 	.byte $00, $00, $00, $0c, $0c, $30, $c0, $00	; "C" {uppercase} 1_1
+   108 7240 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $aa	; "R" {uppercase} 0_0
+   109 7248 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $30, $80	; "R" {uppercase} 1_0
+   110 7250 A2 A0 A0 F0 F0 F0 + 	.byte $a2, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "R" {uppercase} 0_1
+   111 7258 00 80 80 30 30 0C + 	.byte $00, $80, $80, $30, $30, $0c, $0c, $00	; "R" {uppercase} 1_1
+   112 7260 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $a0	; "O" {uppercase} 0_0
+   113 7268 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $0c, $08	; "O" {uppercase} 1_0
+   114 7270 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "O" {uppercase} 0_1
+   115 7278 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "O" {uppercase} 1_1
+   116 7280 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $a0	; "L" {uppercase} 0_0
+   117 7288 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "L" {uppercase} 1_0
+   118 7290 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $ff, $00	; "L" {uppercase} 0_1
+   119 7298 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $fc, $00	; "L" {uppercase} 1_1
+   120 72A0 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $aa	; "P" {uppercase} 0_0
+   121 72A8 00 40 10 0C 0C 0C + 	.byte $00, $40, $10, $0c, $0c, $0c, $30, $80	; "P" {uppercase} 1_0
+   122 72B0 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "P" {uppercase} 0_1
+   123 72B8 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "P" {uppercase} 1_1
+   124 72C0 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $aa	; "A" {uppercase} 0_0
+   125 72C8 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $0c, $a8	; "A" {uppercase} 1_0
+   126 72D0 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "A" {uppercase} 0_1
+   127 72D8 08 08 08 0C 0C 0C + 	.byte $08, $08, $08, $0c, $0c, $0c, $0c, $00	; "A" {uppercase} 1_1
+   128 72E0 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $aa	; "K" {uppercase} 0_0
+   129 72E8 04 04 04 30 30 30 + 	.byte $04, $04, $04, $30, $30, $30, $c0, $00	; "K" {uppercase} 1_0
+   130 72F0 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "K" {uppercase} 0_1
+   131 72F8 80 20 20 30 0C 0C + 	.byte $80, $20, $20, $30, $0c, $0c, $0c, $00	; "K" {uppercase} 1_1
+   132 7300 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $aa	; "E" {uppercase} 0_0
+   133 7308 54 00 00 00 00 00 + 	.byte $54, $00, $00, $00, $00, $00, $00, $a0	; "E" {uppercase} 1_0
+   134 7310 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $ff, $00	; "E" {uppercase} 0_1
+   135 7318 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $fc, $00	; "E" {uppercase} 1_1
+   136 7320 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "[...]" {specialcharacters} 0_0
+   137 7328 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "[...]" {specialcharacters} 1_0
+   138 7330 00 00 00 00 F3 F3 + 	.byte $00, $00, $00, $00, $f3, $f3, $f3, $00	; "[...]" {specialcharacters} 0_1
+   139 7338 00 00 00 00 CF CF + 	.byte $00, $00, $00, $00, $cf, $cf, $cf, $00	; "[...]" {specialcharacters} 1_1
+   140 7340 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "[Atari left]" {specialcharacters} 0_0
+   141 7348 11 11 11 33 33 33 + 	.byte $11, $11, $11, $33, $33, $33, $33, $82	; "[Atari left]" {specialcharacters} 1_0
+   142 7350 00 00 00 03 03 0C + 	.byte $00, $00, $00, $03, $03, $0c, $30, $00	; "[Atari left]" {specialcharacters} 0_1
+   143 7358 82 82 82 03 03 03 + 	.byte $82, $82, $82, $03, $03, $03, $03, $00	; "[Atari left]" {specialcharacters} 1_1
+   144 7360 10 10 10 30 30 30 + 	.byte $10, $10, $10, $30, $30, $30, $30, $08	; "[Atari right]" {specialcharacters} 0_0
+   145 7368 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "[Atari right]" {specialcharacters} 1_0
+   146 7370 08 08 08 03 03 00 + 	.byte $08, $08, $08, $03, $03, $00, $00, $00	; "[Atari right]" {specialcharacters} 0_1
+   147 7378 00 00 00 00 00 C0 + 	.byte $00, $00, $00, $00, $00, $c0, $30, $00	; "[Atari right]" {specialcharacters} 1_1
+   148 7380 15 01 01 03 03 03 + 	.byte $15, $01, $01, $03, $03, $03, $03, $02	; "T" {uppercase} 0_0
+   149 7388 54 40 40 C0 C0 C0 + 	.byte $54, $40, $40, $c0, $c0, $c0, $c0, $80	; "T" {uppercase} 1_0
+   150 7390 02 02 02 03 03 03 + 	.byte $02, $02, $02, $03, $03, $03, $03, $00	; "T" {uppercase} 0_1
+   151 7398 80 80 80 C0 C0 C0 + 	.byte $80, $80, $80, $c0, $c0, $c0, $c0, $00	; "T" {uppercase} 1_1
+   152 73A0 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $aa	; "B" {uppercase} 0_0
+   153 73A8 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $30, $80	; "B" {uppercase} 1_0
+   154 73B0 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $ff, $00	; "B" {uppercase} 0_1
+   155 73B8 20 08 08 0C 0C 30 + 	.byte $20, $08, $08, $0c, $0c, $30, $c0, $00	; "B" {uppercase} 1_1
+   156 73C0 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $a0	; "W" {uppercase} 0_0
+   157 73C8 04 04 04 0C 0C 0C + 	.byte $04, $04, $04, $0c, $0c, $0c, $0c, $08	; "W" {uppercase} 1_0
+   158 73D0 A2 A2 FC FC FC F0 + 	.byte $a2, $a2, $fc, $fc, $fc, $f0, $f0, $00	; "W" {uppercase} 0_1
+   159 73D8 88 88 28 3C 3C 0C + 	.byte $88, $88, $28, $3c, $3c, $0c, $0c, $00	; "W" {uppercase} 1_1
+   160 73E0 00 14 14 FF FF FF + 	.byte $00, $14, $14, $ff, $ff, $ff, $ff, $aa	; "[heart]" {specialcharacters} 0_0
+   161 73E8 00 50 50 FC FC FC + 	.byte $00, $50, $50, $fc, $fc, $fc, $fc, $a8	; "[heart]" {specialcharacters} 1_0
+   162 73F0 2A 2A 0A 0F 03 03 + 	.byte $2a, $2a, $0a, $0f, $03, $03, $00, $00	; "[heart]" {specialcharacters} 0_1
+   163 73F8 A0 A0 80 C0 00 00 + 	.byte $a0, $a0, $80, $c0, $00, $00, $00, $00	; "[heart]" {specialcharacters} 1_1
+   164 7400 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $a0	; "G" {uppercase} 0_0
+   165 7408 40 10 04 08 00 00 + 	.byte $40, $10, $04, $08, $00, $00, $00, $a8	; "G" {uppercase} 1_0
+   166 7410 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "G" {uppercase} 0_1
+   167 7418 0C 0C 0C 0C 0C 30 + 	.byte $0c, $0c, $0c, $0c, $0c, $30, $c0, $00	; "G" {uppercase} 1_1
+   168 7420 01 01 00 FF 00 00 + 	.byte $01, $01, $00, $ff, $00, $00, $00, $00	; "ż" {Polish} 0_0
+   169 7428 40 40 00 FC 3C 3C + 	.byte $40, $40, $00, $fc, $3c, $3c, $3c, $a0	; "ż" {Polish} 1_0
+   170 7430 02 0A 28 F0 F0 F0 + 	.byte $02, $0a, $28, $f0, $f0, $f0, $ff, $00	; "ż" {Polish} 0_1
+   171 7438 80 00 00 00 00 00 + 	.byte $80, $00, $00, $00, $00, $00, $fc, $00	; "ż" {Polish} 1_1
+   172 7440 00 01 00 03 0C 30 + 	.byte $00, $01, $00, $03, $0c, $30, $f0, $a0	; "ó" {Polish} 0_0
+   173 7448 40 00 00 C0 30 0C + 	.byte $40, $00, $00, $c0, $30, $0c, $0c, $08	; "ó" {Polish} 1_0
+   174 7450 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "ó" {Polish} 0_1
+   175 7458 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "ó" {Polish} 1_1
+   176 7460 05 05 05 0F 0F 0F + 	.byte $05, $05, $05, $0f, $0f, $0f, $0f, $0a	; "ł" {Polish} 0_0
+   177 7468 00 00 00 00 00 30 + 	.byte $00, $00, $00, $00, $00, $30, $c0, $00	; "ł" {Polish} 1_0
+   178 7470 2A 8A 0A 0F 0F 03 + 	.byte $2a, $8a, $0a, $0f, $0f, $03, $00, $00	; "ł" {Polish} 0_1
+   179 7478 00 00 00 00 0C 30 + 	.byte $00, $00, $00, $00, $0c, $30, $c0, $00	; "ł" {Polish} 1_1
+   180 7480 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $a0	; "k" {lowercase} 0_0
+   181 7488 00 00 00 0C 0C 0C + 	.byte $00, $00, $00, $0c, $0c, $0c, $30, $30	; "k" {lowercase} 1_0
+   182 7490 A0 AA A0 F0 F0 F0 + 	.byte $a0, $aa, $a0, $f0, $f0, $f0, $f0, $00	; "k" {lowercase} 0_1
+   183 7498 80 00 80 30 30 0C + 	.byte $80, $00, $80, $30, $30, $0c, $0c, $00	; "k" {lowercase} 1_1
+   184 74A0 00 00 00 0F 30 00 + 	.byte $00, $00, $00, $0f, $30, $00, $00, $0a	; "a" {lowercase} 0_0
+   185 74A8 00 00 00 C0 30 3C + 	.byte $00, $00, $00, $c0, $30, $3c, $3c, $28	; "a" {lowercase} 1_0
+   186 74B0 20 80 80 C0 C0 30 + 	.byte $20, $80, $80, $c0, $c0, $30, $0f, $00	; "a" {lowercase} 0_1
+   187 74B8 A8 28 28 3C 3C 30 + 	.byte $a8, $28, $28, $3c, $3c, $30, $c0, $00	; "a" {lowercase} 1_1
+   188 74C0 05 05 55 00 00 00 + 	.byte $05, $05, $55, $00, $00, $00, $00, $02	; "Ż" {Polish} 0_0
+   189 74C8 00 00 54 3C 3C F0 + 	.byte $00, $00, $54, $3c, $3c, $f0, $f0, $80	; "Ż" {Polish} 1_0
+   190 74D0 02 0A 0A 3C 3C F0 + 	.byte $02, $0a, $0a, $3c, $3c, $f0, $ff, $00	; "Ż" {Polish} 0_1
+   191 74D8 80 00 00 00 00 00 + 	.byte $80, $00, $00, $00, $00, $00, $fc, $00	; "Ż" {Polish} 1_1
+   192 74E0 00 00 01 0C 30 F0 + 	.byte $00, $00, $01, $0c, $30, $f0, $f0, $a0	; "Ó" {Polish} 0_0
+   193 74E8 10 40 40 30 0C 0C + 	.byte $10, $40, $40, $30, $0c, $0c, $0c, $08	; "Ó" {Polish} 1_0
+   194 74F0 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "Ó" {Polish} 0_1
+   195 74F8 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "Ó" {Polish} 1_1
+   196 7500 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $a2	; "Ł" {Polish} 0_0
+   197 7508 00 00 00 00 00 30 + 	.byte $00, $00, $00, $00, $00, $30, $c0, $00	; "Ł" {Polish} 1_0
+   198 7510 A8 A0 A0 F0 F0 F0 + 	.byte $a8, $a0, $a0, $f0, $f0, $f0, $ff, $00	; "Ł" {Polish} 0_1
+   199 7518 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $fc, $00	; "Ł" {Polish} 1_1
+   200 7520 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $a0	; "D" {uppercase} 0_0
+   201 7528 00 40 10 30 0C 0C + 	.byte $00, $40, $10, $30, $0c, $0c, $0c, $08	; "D" {uppercase} 1_0
+   202 7530 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $ff, $00	; "D" {uppercase} 0_1
+   203 7538 08 08 08 30 30 C0 + 	.byte $08, $08, $08, $30, $30, $c0, $00, $00	; "D" {uppercase} 1_1
+   204 7540 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $aa	; "F" {uppercase} 0_0
+   205 7548 54 00 00 00 00 00 + 	.byte $54, $00, $00, $00, $00, $00, $00, $a0	; "F" {uppercase} 1_0
+   206 7550 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "F" {uppercase} 0_1
+   207 7558 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "F" {uppercase} 1_1
+   208 7560 55 00 00 00 00 00 + 	.byte $55, $00, $00, $00, $00, $00, $00, $00	; "J" {uppercase} 0_0
+   209 7568 54 14 14 3C 3C 3C + 	.byte $54, $14, $14, $3c, $3c, $3c, $3c, $28	; "J" {uppercase} 1_0
+   210 7570 00 00 00 00 C0 30 + 	.byte $00, $00, $00, $00, $c0, $30, $0f, $00	; "J" {uppercase} 0_1
+   211 7578 28 28 28 3C 30 C0 + 	.byte $28, $28, $28, $3c, $30, $c0, $00, $00	; "J" {uppercase} 1_1
+   212 7580 50 50 54 FC F3 F3 + 	.byte $50, $50, $54, $fc, $f3, $f3, $f0, $a0	; "M" {uppercase} 0_0
+   213 7588 04 04 14 3C CC CC + 	.byte $04, $04, $14, $3c, $cc, $cc, $0c, $08	; "M" {uppercase} 1_0
+   214 7590 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "M" {uppercase} 0_1
+   215 7598 08 08 08 0C 0C 0C + 	.byte $08, $08, $08, $0c, $0c, $0c, $0c, $00	; "M" {uppercase} 1_1
+   216 75A0 50 50 54 FC F3 F3 + 	.byte $50, $50, $54, $fc, $f3, $f3, $f3, $a2	; "N" {uppercase} 0_0
+   217 75A8 04 04 04 0C 0C 0C + 	.byte $04, $04, $04, $0c, $0c, $0c, $0c, $08	; "N" {uppercase} 1_0
+   218 75B0 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "N" {uppercase} 0_1
+   219 75B8 88 88 88 3C 3C 0C + 	.byte $88, $88, $88, $3c, $3c, $0c, $0c, $00	; "N" {uppercase} 1_1
+   220 75C0 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $a0	; "Q" {uppercase} 0_0
+   221 75C8 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $0c, $08	; "Q" {uppercase} 1_0
+   222 75D0 A0 A0 A0 F0 F0 30 + 	.byte $a0, $a0, $a0, $f0, $f0, $30, $0f, $00	; "Q" {uppercase} 0_1
+   223 75D8 08 88 88 30 30 CC + 	.byte $08, $88, $88, $30, $30, $cc, $0c, $00	; "Q" {uppercase} 1_1
+   224 75E0 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $f0, $a0	; "U" {uppercase} 0_0
+   225 75E8 04 04 04 0C 0C 0C + 	.byte $04, $04, $04, $0c, $0c, $0c, $0c, $08	; "U" {uppercase} 1_0
+   226 75F0 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "U" {uppercase} 0_1
+   227 75F8 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "U" {uppercase} 1_1
+   228 7600 50 50 50 F0 F0 F0 + 	.byte $50, $50, $50, $f0, $f0, $f0, $3c, $28	; "V" {uppercase} 0_0
+   229 7608 04 04 04 30 30 30 + 	.byte $04, $04, $04, $30, $30, $30, $30, $80	; "V" {uppercase} 1_0
+   230 7610 28 28 28 0F 0F 0F + 	.byte $28, $28, $28, $0f, $0f, $0f, $0f, $00	; "V" {uppercase} 0_1
+   231 7618 80 80 80 00 00 00 + 	.byte $80, $80, $80, $00, $00, $00, $00, $00	; "V" {uppercase} 1_1
+   232 7620 50 50 50 F0 3C 3C + 	.byte $50, $50, $50, $f0, $3c, $3c, $0f, $0a	; "X" {uppercase} 0_0
+   233 7628 04 04 04 0C 30 30 + 	.byte $04, $04, $04, $0c, $30, $30, $c0, $80	; "X" {uppercase} 1_0
+   234 7630 08 28 28 F0 F0 F0 + 	.byte $08, $28, $28, $f0, $f0, $f0, $f0, $00	; "X" {uppercase} 0_1
+   235 7638 20 20 20 0C 0C 0C + 	.byte $20, $20, $20, $0c, $0c, $0c, $0c, $00	; "X" {uppercase} 1_1
+   236 7640 50 50 50 F0 3C 3C + 	.byte $50, $50, $50, $f0, $3c, $3c, $0f, $0a	; "Y" {uppercase} 0_0
+   237 7648 04 04 04 0C 30 30 + 	.byte $04, $04, $04, $0c, $30, $30, $f0, $80	; "Y" {uppercase} 1_0
+   238 7650 02 02 02 03 03 03 + 	.byte $02, $02, $02, $03, $03, $03, $03, $00	; "Y" {uppercase} 0_1
+   239 7658 80 80 80 C0 C0 C0 + 	.byte $80, $80, $80, $c0, $c0, $c0, $c0, $00	; "Y" {uppercase} 1_1
+   240 7660 55 00 00 00 00 00 + 	.byte $55, $00, $00, $00, $00, $00, $03, $02	; "Z" {uppercase} 0_0
+   241 7668 54 14 14 3C F0 F0 + 	.byte $54, $14, $14, $3c, $f0, $f0, $c0, $80	; "Z" {uppercase} 1_0
+   242 7670 0A 0A 28 3C F0 F0 + 	.byte $0a, $0a, $28, $3c, $f0, $f0, $ff, $00	; "Z" {uppercase} 0_1
+   243 7678 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $fc, $00	; "Z" {uppercase} 1_1
+   244 7680 50 50 50 F3 FC F0 + 	.byte $50, $50, $50, $f3, $fc, $f0, $f0, $a0	; "b" {lowercase} 0_0
+   245 7688 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $08	; "b" {lowercase} 1_0
+   246 7690 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $ff, $00	; "b" {lowercase} 0_1
+   247 7698 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "b" {lowercase} 1_1
+   248 76A0 00 00 00 03 0C 30 + 	.byte $00, $00, $00, $03, $0c, $30, $f0, $a0	; "c" {lowercase} 0_0
+   249 76A8 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $00	; "c" {lowercase} 1_0
+   250 76B0 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "c" {lowercase} 0_1
+   251 76B8 00 00 00 0C 0C 30 + 	.byte $00, $00, $00, $0c, $0c, $30, $c0, $00	; "c" {lowercase} 1_1
+   252 76C0 01 01 01 00 00 0F + 	.byte $01, $01, $01, $00, $00, $0f, $03, $02	; "i" {lowercase} 0_0
+   253 76C8 40 40 40 00 00 C0 + 	.byte $40, $40, $40, $00, $00, $c0, $c0, $80	; "i" {lowercase} 1_0
+   254 76D0 02 02 02 03 03 03 + 	.byte $02, $02, $02, $03, $03, $03, $0f, $00	; "i" {lowercase} 0_1
+   255 76D8 80 80 80 C0 C0 C0 + 	.byte $80, $80, $80, $c0, $c0, $c0, $f0, $00	; "i" {lowercase} 1_1
+   256 76E0 01 01 01 00 00 03 + 	.byte $01, $01, $01, $00, $00, $03, $03, $02	; "j" {lowercase} 0_0
+   257 76E8 40 40 40 00 00 C0 + 	.byte $40, $40, $40, $00, $00, $c0, $c0, $80	; "j" {lowercase} 1_0
+   258 76F0 02 02 02 03 C3 C3 + 	.byte $02, $02, $02, $03, $c3, $c3, $3c, $00	; "j" {lowercase} 0_1
+   259 76F8 80 80 80 C0 C0 00 + 	.byte $80, $80, $80, $c0, $c0, $00, $00, $00	; "j" {lowercase} 1_1
+   260 7700 14 14 14 3C 3C 3C + 	.byte $14, $14, $14, $3c, $3c, $3c, $3c, $28	; "l" {lowercase} 0_0
+   261 7708 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "l" {lowercase} 1_0
+   262 7710 28 28 28 3C 3C 0C + 	.byte $28, $28, $28, $3c, $3c, $0c, $03, $00	; "l" {lowercase} 0_1
+   263 7718 00 00 00 00 30 30 + 	.byte $00, $00, $00, $00, $30, $30, $c0, $00	; "l" {lowercase} 1_1
+   264 7720 00 00 00 FF F0 F0 + 	.byte $00, $00, $00, $ff, $f0, $f0, $f0, $a0	; "n" {lowercase} 0_0
+   265 7728 00 00 00 00 C0 30 + 	.byte $00, $00, $00, $00, $c0, $30, $30, $08	; "n" {lowercase} 1_0
+   266 7730 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "n" {lowercase} 0_1
+   267 7738 08 08 08 0C 0C 0C + 	.byte $08, $08, $08, $0c, $0c, $0c, $0c, $00	; "n" {lowercase} 1_1
+   268 7740 00 00 00 FF F0 F0 + 	.byte $00, $00, $00, $ff, $f0, $f0, $f0, $a0	; "p" {lowercase} 0_0
+   269 7748 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $08	; "p" {lowercase} 1_0
+   270 7750 A0 A0 AA F0 F0 F0 + 	.byte $a0, $a0, $aa, $f0, $f0, $f0, $f0, $00	; "p" {lowercase} 0_1
+   271 7758 20 80 00 00 00 00 + 	.byte $20, $80, $00, $00, $00, $00, $00, $00	; "p" {lowercase} 1_1
+   272 7760 00 00 00 03 0C 30 + 	.byte $00, $00, $00, $03, $0c, $30, $c0, $80	; "q" {lowercase} 0_0
+   273 7768 00 00 00 FC 3C 3C + 	.byte $00, $00, $00, $fc, $3c, $3c, $3c, $28	; "q" {lowercase} 1_0
+   274 7770 80 20 0A 00 00 00 + 	.byte $80, $20, $0a, $00, $00, $00, $00, $00	; "q" {lowercase} 0_1
+   275 7778 28 28 A8 3C 3C 3C + 	.byte $28, $28, $a8, $3c, $3c, $3c, $3c, $00	; "q" {lowercase} 1_1
+   276 7780 00 00 00 FF F0 F0 + 	.byte $00, $00, $00, $ff, $f0, $f0, $f0, $a0	; "r" {lowercase} 0_0
+   277 7788 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $00	; "r" {lowercase} 1_0
+   278 7790 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "r" {lowercase} 0_1
+   279 7798 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "r" {lowercase} 1_1
+   280 77A0 00 00 00 F0 F0 F0 + 	.byte $00, $00, $00, $f0, $f0, $f0, $3c, $28	; "v" {lowercase} 0_0
+   281 77A8 00 00 00 30 30 30 + 	.byte $00, $00, $00, $30, $30, $30, $30, $80	; "v" {lowercase} 1_0
+   282 77B0 28 28 28 0F 0F 0F + 	.byte $28, $28, $28, $0f, $0f, $0f, $0f, $00	; "v" {lowercase} 0_1
+   283 77B8 80 80 80 00 00 00 + 	.byte $80, $80, $80, $00, $00, $00, $00, $00	; "v" {lowercase} 1_1
+   284 77C0 00 00 00 F0 F0 F0 + 	.byte $00, $00, $00, $f0, $f0, $f0, $f0, $a0	; "w" {lowercase} 0_0
+   285 77C8 00 00 00 0C 0C 0C + 	.byte $00, $00, $00, $0c, $0c, $0c, $0c, $08	; "w" {lowercase} 1_0
+   286 77D0 A2 A2 FC FC FC F0 + 	.byte $a2, $a2, $fc, $fc, $fc, $f0, $f0, $00	; "w" {lowercase} 0_1
+   287 77D8 88 88 28 3C 3C 0C + 	.byte $88, $88, $28, $3c, $3c, $0c, $0c, $00	; "w" {lowercase} 1_1
+   288 77E0 00 00 00 F0 F0 3C + 	.byte $00, $00, $00, $f0, $f0, $3c, $3c, $08	; "x" {lowercase} 0_0
+   289 77E8 00 00 00 0C 0C 3C + 	.byte $00, $00, $00, $0c, $0c, $3c, $30, $20	; "x" {lowercase} 1_0
+   290 77F0 0A 0A 28 3C F0 F0 + 	.byte $0a, $0a, $28, $3c, $f0, $f0, $f0, $00	; "x" {lowercase} 0_1
+   291 77F8 A0 A0 20 3C 0C 0C + 	.byte $a0, $a0, $20, $3c, $0c, $0c, $0c, $00	; "x" {lowercase} 1_1
+   292 7800 00 00 00 FF 00 00 + 	.byte $00, $00, $00, $ff, $00, $00, $00, $00	; "z" {lowercase} 0_0
+   293 7808 00 00 00 FC 3C 3C + 	.byte $00, $00, $00, $fc, $3c, $3c, $3c, $a0	; "z" {lowercase} 1_0
+   294 7810 02 0A 28 F0 F0 F0 + 	.byte $02, $0a, $28, $f0, $f0, $f0, $ff, $00	; "z" {lowercase} 0_1
+   295 7818 80 00 00 00 00 00 + 	.byte $80, $00, $00, $00, $00, $00, $fc, $00	; "z" {lowercase} 1_1
+   296 7820 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $a0	; "0" {digits} 0_0
+   297 7828 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $0c, $88	; "0" {digits} 1_0
+   298 7830 A2 A0 A0 F0 30 0C + 	.byte $a2, $a0, $a0, $f0, $30, $0c, $03, $00	; "0" {digits} 0_1
+   299 7838 08 08 08 0C 0C 30 + 	.byte $08, $08, $08, $0c, $0c, $30, $c0, $00	; "0" {digits} 1_1
+   300 7840 05 11 01 03 03 03 + 	.byte $05, $11, $01, $03, $03, $03, $03, $02	; "1" {digits} 0_0
+   301 7848 40 40 40 C0 C0 C0 + 	.byte $40, $40, $40, $c0, $c0, $c0, $c0, $80	; "1" {digits} 1_0
+   302 7850 02 02 02 03 03 03 + 	.byte $02, $02, $02, $03, $03, $03, $3f, $00	; "1" {digits} 0_1
+   303 7858 80 80 80 C0 C0 C0 + 	.byte $80, $80, $80, $c0, $c0, $c0, $fc, $00	; "1" {digits} 1_1
+   304 7860 05 10 40 C0 00 00 + 	.byte $05, $10, $40, $c0, $00, $00, $00, $00	; "2" {digits} 0_0
+   305 7868 00 40 10 3C 3C 3C + 	.byte $00, $40, $10, $3c, $3c, $3c, $30, $80	; "2" {digits} 1_0
+   306 7870 02 08 20 F0 F0 F0 + 	.byte $02, $08, $20, $f0, $f0, $f0, $ff, $00	; "2" {digits} 0_1
+   307 7878 00 00 00 00 00 0C + 	.byte $00, $00, $00, $00, $00, $0c, $fc, $00	; "2" {digits} 1_1
+   308 7880 05 10 40 C0 00 00 + 	.byte $05, $10, $40, $c0, $00, $00, $00, $02	; "3" {digits} 0_0
+   309 7888 00 40 10 3C 3C 3C + 	.byte $00, $40, $10, $3c, $3c, $3c, $f0, $80	; "3" {digits} 1_0
+   310 7890 00 00 00 C0 C0 30 + 	.byte $00, $00, $00, $c0, $c0, $30, $0f, $00	; "3" {digits} 0_1
+   311 7898 A0 28 28 3C 30 C0 + 	.byte $a0, $28, $28, $3c, $30, $c0, $00, $00	; "3" {digits} 1_1
+   312 78A0 00 01 04 30 C0 C0 + 	.byte $00, $01, $04, $30, $c0, $c0, $c0, $aa	; "4" {digits} 0_0
+   313 78A8 54 14 14 3C 3C 3C + 	.byte $54, $14, $14, $3c, $3c, $3c, $3c, $a8	; "4" {digits} 1_0
+   314 78B0 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "4" {digits} 0_1
+   315 78B8 28 28 28 3C 3C 3C + 	.byte $28, $28, $28, $3c, $3c, $3c, $3c, $00	; "4" {digits} 1_1
+   316 78C0 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $f0, $aa	; "5" {digits} 0_0
+   317 78C8 54 00 00 00 00 00 + 	.byte $54, $00, $00, $00, $00, $00, $00, $80	; "5" {digits} 1_0
+   318 78D0 00 00 00 C0 C0 30 + 	.byte $00, $00, $00, $c0, $c0, $30, $0f, $00	; "5" {digits} 0_1
+   319 78D8 20 08 08 0C 0C 30 + 	.byte $20, $08, $08, $0c, $0c, $30, $c0, $00	; "5" {digits} 1_1
+   320 78E0 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $aa	; "6" {digits} 0_0
+   321 78E8 40 10 04 08 00 00 + 	.byte $40, $10, $04, $08, $00, $00, $00, $80	; "6" {digits} 1_0
+   322 78F0 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "6" {digits} 0_1
+   323 78F8 20 08 08 0C 0C 30 + 	.byte $20, $08, $08, $0c, $0c, $30, $c0, $00	; "6" {digits} 1_1
+   324 7900 55 00 00 00 00 00 + 	.byte $55, $00, $00, $00, $00, $00, $00, $00	; "7" {digits} 0_0
+   325 7908 54 14 14 3C 3C F0 + 	.byte $54, $14, $14, $3c, $3c, $f0, $f0, $a0	; "7" {digits} 1_0
+   326 7910 00 02 02 03 03 03 + 	.byte $00, $02, $02, $03, $03, $03, $03, $00	; "7" {digits} 0_1
+   327 7918 A0 80 80 C0 C0 C0 + 	.byte $a0, $80, $80, $c0, $c0, $c0, $c0, $00	; "7" {digits} 1_1
+   328 7920 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $30, $0a	; "8" {digits} 0_0
+   329 7928 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $30, $80	; "8" {digits} 1_0
+   330 7930 20 A0 A0 F0 F0 30 + 	.byte $20, $a0, $a0, $f0, $f0, $30, $0f, $00	; "8" {digits} 0_1
+   331 7938 20 08 08 0C 0C 30 + 	.byte $20, $08, $08, $0c, $0c, $30, $c0, $00	; "8" {digits} 1_1
+   332 7940 05 10 40 C0 C0 C0 + 	.byte $05, $10, $40, $c0, $c0, $c0, $30, $0a	; "9" {digits} 0_0
+   333 7948 00 40 10 3C 3C 3C + 	.byte $00, $40, $10, $3c, $3c, $3c, $3c, $a8	; "9" {digits} 1_0
+   334 7950 00 00 00 C0 C0 30 + 	.byte $00, $00, $00, $c0, $c0, $30, $0f, $00	; "9" {digits} 0_1
+   335 7958 28 28 28 3C 30 C0 + 	.byte $28, $28, $28, $3c, $30, $c0, $00, $00	; "9" {digits} 1_1
+   336 7960 01 04 10 F0 F0 F0 + 	.byte $01, $04, $10, $f0, $f0, $f0, $f0, $aa	; "Ą" {Polish} 0_0
+   337 7968 40 10 04 0C 0C 0C + 	.byte $40, $10, $04, $0c, $0c, $0c, $0c, $a8	; "Ą" {Polish} 1_0
+   338 7970 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "Ą" {Polish} 0_1
+   339 7978 08 08 08 0C 30 30 + 	.byte $08, $08, $08, $0c, $30, $30, $c0, $00	; "Ą" {Polish} 1_1
+   340 7980 00 00 01 0C 30 F0 + 	.byte $00, $00, $01, $0c, $30, $f0, $f0, $a0	; "Ć" {Polish} 0_0
+   341 7988 10 40 40 30 0C 0C + 	.byte $10, $40, $40, $30, $0c, $0c, $00, $00	; "Ć" {Polish} 1_0
+   342 7990 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "Ć" {Polish} 0_1
+   343 7998 00 00 00 0C 0C 30 + 	.byte $00, $00, $00, $0c, $0c, $30, $c0, $00	; "Ć" {Polish} 1_1
+   344 79A0 55 50 50 F0 F0 F0 + 	.byte $55, $50, $50, $f0, $f0, $f0, $ff, $a0	; "Ę" {Polish} 0_0
+   345 79A8 54 00 00 00 00 00 + 	.byte $54, $00, $00, $00, $00, $00, $f0, $00	; "Ę" {Polish} 1_0
+   346 79B0 A0 A0 A0 FF 00 00 + 	.byte $a0, $a0, $a0, $ff, $00, $00, $00, $00	; "Ę" {Polish} 0_1
+   347 79B8 00 00 00 FC 0C 0C + 	.byte $00, $00, $00, $fc, $0c, $0c, $30, $00	; "Ę" {Polish} 1_1
+   348 79C0 00 01 50 F0 FC FC + 	.byte $00, $01, $50, $f0, $fc, $fc, $f3, $a2	; "Ń" {Polish} 0_0
+   349 79C8 40 00 04 0C 0C 0C + 	.byte $40, $00, $04, $0c, $0c, $0c, $0c, $08	; "Ń" {Polish} 1_0
+   350 79D0 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "Ń" {Polish} 0_1
+   351 79D8 88 88 88 3C 3C 0C + 	.byte $88, $88, $88, $3c, $3c, $0c, $0c, $00	; "Ń" {Polish} 1_1
+   352 79E0 00 00 01 0C 30 F0 + 	.byte $00, $00, $01, $0c, $30, $f0, $f0, $20	; "Ś" {Polish} 0_0
+   353 79E8 10 40 40 30 0C 0C + 	.byte $10, $40, $40, $30, $0c, $0c, $00, $00	; "Ś" {Polish} 1_0
+   354 79F0 0A 00 00 C0 C0 30 + 	.byte $0a, $00, $00, $c0, $c0, $30, $0f, $00	; "Ś" {Polish} 0_1
+   355 79F8 80 20 08 0C 0C 30 + 	.byte $80, $20, $08, $0c, $0c, $30, $c0, $00	; "Ś" {Polish} 1_1
+   356 7A00 00 01 55 00 00 00 + 	.byte $00, $01, $55, $00, $00, $00, $00, $02	; "Ź" {Polish} 0_0
+   357 7A08 40 00 54 3C 3C F0 + 	.byte $40, $00, $54, $3c, $3c, $f0, $f0, $80	; "Ź" {Polish} 1_0
+   358 7A10 02 0A 0A 3C 3C F0 + 	.byte $02, $0a, $0a, $3c, $3c, $f0, $ff, $00	; "Ź" {Polish} 0_1
+   359 7A18 80 00 00 00 00 00 + 	.byte $80, $00, $00, $00, $00, $00, $fc, $00	; "Ź" {Polish} 1_1
+   360 7A20 00 00 00 0F 30 00 + 	.byte $00, $00, $00, $0f, $30, $00, $00, $0a	; "ą" {Polish} 0_0
+   361 7A28 00 00 00 C0 30 3C + 	.byte $00, $00, $00, $c0, $30, $3c, $3c, $28	; "ą" {Polish} 1_0
+   362 7A30 20 80 80 C0 30 0F + 	.byte $20, $80, $80, $c0, $30, $0f, $00, $00	; "ą" {Polish} 0_1
+   363 7A38 A8 28 28 30 F0 30 + 	.byte $a8, $28, $28, $30, $f0, $30, $0c, $00	; "ą" {Polish} 1_1
+   364 7A40 00 01 00 03 0C 30 + 	.byte $00, $01, $00, $03, $0c, $30, $f0, $a0	; "ć" {Polish} 0_0
+   365 7A48 40 00 00 C0 30 0C + 	.byte $40, $00, $00, $c0, $30, $0c, $0c, $00	; "ć" {Polish} 1_0
+   366 7A50 A0 A0 A0 F0 30 0C + 	.byte $a0, $a0, $a0, $f0, $30, $0c, $03, $00	; "ć" {Polish} 0_1
+   367 7A58 00 00 00 0C 0C 30 + 	.byte $00, $00, $00, $0c, $0c, $30, $c0, $00	; "ć" {Polish} 1_1
+   368 7A60 00 00 00 03 0C 30 + 	.byte $00, $00, $00, $03, $0c, $30, $f0, $a0	; "ę" {Polish} 0_0
+   369 7A68 00 00 00 C0 30 0C + 	.byte $00, $00, $00, $c0, $30, $0c, $0c, $08	; "ę" {Polish} 1_0
+   370 7A70 AA A0 20 0C 03 00 + 	.byte $aa, $a0, $20, $0c, $03, $00, $00, $00	; "ę" {Polish} 0_1
+   371 7A78 A0 00 00 0C F0 30 + 	.byte $a0, $00, $00, $0c, $f0, $30, $c0, $00	; "ę" {Polish} 1_1
+   372 7A80 01 04 00 FF F0 F0 + 	.byte $01, $04, $00, $ff, $f0, $f0, $f0, $a0	; "ń" {Polish} 0_0
+   373 7A88 00 00 00 00 C0 30 + 	.byte $00, $00, $00, $00, $c0, $30, $30, $08	; "ń" {Polish} 1_0
+   374 7A90 A0 A0 A0 F0 F0 F0 + 	.byte $a0, $a0, $a0, $f0, $f0, $f0, $f0, $00	; "ń" {Polish} 0_1
+   375 7A98 08 08 08 0C 0C 0C + 	.byte $08, $08, $08, $0c, $0c, $0c, $0c, $00	; "ń" {Polish} 1_1
+   376 7AA0 00 01 00 0F 30 F0 + 	.byte $00, $01, $00, $0f, $30, $f0, $f0, $a0	; "ś" {Polish} 0_0
+   377 7AA8 40 00 00 C0 30 0C + 	.byte $40, $00, $00, $c0, $30, $0c, $0c, $00	; "ś" {Polish} 1_0
+   378 7AB0 20 0A 00 00 C0 30 + 	.byte $20, $0a, $00, $00, $c0, $30, $0f, $00	; "ś" {Polish} 0_1
+   379 7AB8 00 80 20 0C 0C 30 + 	.byte $00, $80, $20, $0c, $0c, $30, $c0, $00	; "ś" {Polish} 1_1
+   380 7AC0 00 01 00 FF 00 00 + 	.byte $00, $01, $00, $ff, $00, $00, $00, $00	; "ź" {Polish} 0_0
+   381 7AC8 40 00 00 FC 3C 3C + 	.byte $40, $00, $00, $fc, $3c, $3c, $3c, $a0	; "ź" {Polish} 1_0
+   382 7AD0 02 0A 28 F0 F0 F0 + 	.byte $02, $0a, $28, $f0, $f0, $f0, $ff, $00	; "ź" {Polish} 0_1
+   383 7AD8 80 00 00 00 00 00 + 	.byte $80, $00, $00, $00, $00, $00, $fc, $00	; "ź" {Polish} 1_1
+   384 7AE0 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "." {specialcharacters} 0_0
+   385 7AE8 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "." {specialcharacters} 1_0
+   386 7AF0 00 00 00 00 0F 0F + 	.byte $00, $00, $00, $00, $0f, $0f, $0f, $00	; "." {specialcharacters} 0_1
+   387 7AF8 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "." {specialcharacters} 1_1
+   388 7B00 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "," {specialcharacters} 0_0
+   389 7B08 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "," {specialcharacters} 1_0
+   390 7B10 00 02 02 0F 0F 3C + 	.byte $00, $02, $02, $0f, $0f, $3c, $3c, $00	; "," {specialcharacters} 0_1
+   391 7B18 00 80 80 00 00 00 + 	.byte $00, $80, $80, $00, $00, $00, $00, $00	; "," {specialcharacters} 1_1
+   392 7B20 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $0f, $0a	; ":" {specialcharacters} 0_0
+   393 7B28 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; ":" {specialcharacters} 1_0
+   394 7B30 0A 00 00 00 0F 0F + 	.byte $0a, $00, $00, $00, $0f, $0f, $0f, $00	; ":" {specialcharacters} 0_1
+   395 7B38 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; ":" {specialcharacters} 1_1
+   396 7B40 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "_" {specialcharacters} 0_0
+   397 7B48 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "_" {specialcharacters} 1_0
+   398 7B50 00 00 00 00 00 3F + 	.byte $00, $00, $00, $00, $00, $3f, $3f, $00	; "_" {specialcharacters} 0_1
+   399 7B58 00 00 00 00 00 F0 + 	.byte $00, $00, $00, $00, $00, $f0, $f0, $00	; "_" {specialcharacters} 1_1
+   400 7B60 05 10 40 C0 00 00 + 	.byte $05, $10, $40, $c0, $00, $00, $00, $02	; "?" {specialcharacters} 0_0
+   401 7B68 40 10 04 0C 0C 30 + 	.byte $40, $10, $04, $0c, $0c, $30, $c0, $80	; "?" {specialcharacters} 1_0
+   402 7B70 02 02 00 00 03 03 + 	.byte $02, $02, $00, $00, $03, $03, $03, $00	; "?" {specialcharacters} 0_1
+   403 7B78 80 80 00 00 C0 C0 + 	.byte $80, $80, $00, $00, $c0, $c0, $c0, $00	; "?" {specialcharacters} 1_1
+   404 7B80 50 50 50 FC 3C 3F + 	.byte $50, $50, $50, $fc, $3c, $3f, $0f, $0a	; "\" {specialcharacters} 0_0
+   405 7B88 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $80	; "\" {specialcharacters} 1_0
+   406 7B90 02 02 00 00 00 00 + 	.byte $02, $02, $00, $00, $00, $00, $00, $00	; "\" {specialcharacters} 0_1
+   407 7B98 80 A0 A0 FC 3C 3C + 	.byte $80, $a0, $a0, $fc, $3c, $3c, $3c, $00	; "\" {specialcharacters} 1_1
+   408 7BA0 00 00 00 00 00 03 + 	.byte $00, $00, $00, $00, $00, $03, $03, $0a	; "/" {specialcharacters} 0_0
+   409 7BA8 14 14 14 FC F0 F0 + 	.byte $14, $14, $14, $fc, $f0, $f0, $c0, $80	; "/" {specialcharacters} 1_0
+   410 7BB0 0A 2A 28 FC F0 F0 + 	.byte $0a, $2a, $28, $fc, $f0, $f0, $f0, $00	; "/" {specialcharacters} 0_1
+   411 7BB8 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; "/" {specialcharacters} 1_1
+   412 7BC0 00 00 01 03 0F 0F + 	.byte $00, $00, $01, $03, $0f, $0f, $0f, $0a	; "(" {specialcharacters} 0_0
+   413 7BC8 10 40 00 00 00 00 + 	.byte $10, $40, $00, $00, $00, $00, $00, $00	; "(" {specialcharacters} 1_0
+   414 7BD0 0A 0A 0A 03 03 00 + 	.byte $0a, $0a, $0a, $03, $03, $00, $00, $00	; "(" {specialcharacters} 0_1
+   415 7BD8 00 00 00 00 00 C0 + 	.byte $00, $00, $00, $00, $00, $c0, $30, $00	; "(" {specialcharacters} 1_1
+   416 7BE0 04 01 00 00 00 00 + 	.byte $04, $01, $00, $00, $00, $00, $00, $00	; ")" {specialcharacters} 0_0
+   417 7BE8 00 00 40 C0 F0 F0 + 	.byte $00, $00, $40, $c0, $f0, $f0, $f0, $a0	; ")" {specialcharacters} 1_0
+   418 7BF0 00 00 00 00 00 03 + 	.byte $00, $00, $00, $00, $00, $03, $0c, $00	; ")" {specialcharacters} 0_1
+   419 7BF8 A0 A0 A0 C0 C0 00 + 	.byte $a0, $a0, $a0, $c0, $c0, $00, $00, $00	; ")" {specialcharacters} 1_1
+   420 7C00 50 50 50 00 00 00 + 	.byte $50, $50, $50, $00, $00, $00, $03, $02	; "%" {specialcharacters} 0_0
+   421 7C08 04 04 10 30 C0 C0 + 	.byte $04, $04, $10, $30, $c0, $c0, $00, $00	; "%" {specialcharacters} 1_0
+   422 7C10 08 08 20 30 C0 C0 + 	.byte $08, $08, $20, $30, $c0, $c0, $00, $00	; "%" {specialcharacters} 0_1
+   423 7C18 00 00 00 00 3C 3C + 	.byte $00, $00, $00, $00, $3c, $3c, $3c, $00	; "%" {specialcharacters} 1_1
+   424 7C20 05 10 50 F0 F0 30 + 	.byte $05, $10, $50, $f0, $f0, $30, $0c, $02	; "&" {specialcharacters} 0_0
+   425 7C28 00 40 10 30 30 30 + 	.byte $00, $40, $10, $30, $30, $30, $c0, $00	; "&" {specialcharacters} 1_0
+   426 7C30 2A A0 A0 F0 F0 30 + 	.byte $2a, $a0, $a0, $f0, $f0, $30, $0f, $00	; "&" {specialcharacters} 0_1
+   427 7C38 00 88 88 30 30 3C + 	.byte $00, $88, $88, $30, $30, $3c, $cc, $00	; "&" {specialcharacters} 1_1
+   428 7C40 00 00 00 00 03 03 + 	.byte $00, $00, $00, $00, $03, $03, $03, $2a	; "+" {specialcharacters} 0_0
+   429 7C48 00 00 00 00 C0 C0 + 	.byte $00, $00, $00, $00, $c0, $c0, $c0, $a8	; "+" {specialcharacters} 1_0
+   430 7C50 2A 02 02 03 03 00 + 	.byte $2a, $02, $02, $03, $03, $00, $00, $00	; "+" {specialcharacters} 0_1
+   431 7C58 A8 80 80 C0 C0 00 + 	.byte $a8, $80, $80, $c0, $c0, $00, $00, $00	; "+" {specialcharacters} 1_1
+   432 7C60 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $2a	; "-" {specialcharacters} 0_0
+   433 7C68 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $a0	; "-" {specialcharacters} 1_0
+   434 7C70 2A 00 00 00 00 00 + 	.byte $2a, $00, $00, $00, $00, $00, $00, $00	; "-" {specialcharacters} 0_1
+   435 7C78 A0 00 00 00 00 00 + 	.byte $a0, $00, $00, $00, $00, $00, $00, $00	; "-" {specialcharacters} 1_1
+   436 7C80 00 00 00 00 00 3F + 	.byte $00, $00, $00, $00, $00, $3f, $3f, $00	; "=" {specialcharacters} 0_0
+   437 7C88 00 00 00 00 00 F0 + 	.byte $00, $00, $00, $00, $00, $f0, $f0, $00	; "=" {specialcharacters} 1_0
+   438 7C90 00 2A 2A 00 00 00 + 	.byte $00, $2a, $2a, $00, $00, $00, $00, $00	; "=" {specialcharacters} 0_1
+   439 7C98 00 A0 A0 00 00 00 + 	.byte $00, $a0, $a0, $00, $00, $00, $00, $00	; "=" {specialcharacters} 1_1
+   440 7CA0 00 01 04 30 C0 C0 + 	.byte $00, $01, $04, $30, $c0, $c0, $cc, $80	; "[happy face]" {specialcharacters} 0_0
+   441 7CA8 00 40 10 0C 03 03 + 	.byte $00, $40, $10, $0c, $03, $03, $33, $02	; "[happy face]" {specialcharacters} 1_0
+   442 7CB0 80 88 82 C0 30 0C + 	.byte $80, $88, $82, $c0, $30, $0c, $03, $00	; "[happy face]" {specialcharacters} 0_1
+   443 7CB8 02 22 82 03 0C 30 + 	.byte $02, $22, $82, $03, $0c, $30, $c0, $00	; "[happy face]" {specialcharacters} 1_1
+   444 7CC0 01 04 10 C0 C0 C0 + 	.byte $01, $04, $10, $c0, $c0, $c0, $cc, $80	; "[sad face]" {specialcharacters} 0_0
+   445 7CC8 40 10 04 03 03 03 + 	.byte $40, $10, $04, $03, $03, $03, $33, $02	; "[sad face]" {specialcharacters} 1_0
+   446 7CD0 80 82 88 C0 30 0C + 	.byte $80, $82, $88, $c0, $30, $0c, $03, $00	; "[sad face]" {specialcharacters} 0_1
+   447 7CD8 02 82 22 03 0C 30 + 	.byte $02, $82, $22, $03, $0c, $30, $c0, $00	; "[sad face]" {specialcharacters} 1_1
+   448 7CE0			fontsen
