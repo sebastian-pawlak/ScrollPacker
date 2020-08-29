@@ -1,0 +1,181 @@
+mads 2.0.6 build 58 (28 Jan 17)
+     1 				; "1x1 scroll, example 3", Atari XL/XE Intro
+     2 				;
+     3 				; what it does:
+     4 				; - 1x1-character scroll in ANTIC mode 2
+     5 				; - supports up to 128 unique 1x1-fonts
+     6 				; - fonts come from several separate input font sets
+     7 				; - length of scroll is limited by available memory only
+     8 				; - zero in 'text' means the end of scroll
+     9 				;
+    10 				; code by tr1x / Agenda
+    11 				; requirements: original Atari XL/XE 64KB PAL
+    12 				; version: 1.0
+    13 				; date: 2020-05-24
+    14
+    15 = 4000			video	equ $4000
+    16
+    17 = 0012			rtclok	equ $0012
+    18 = 00C0			txtptr	equ $00c0
+    19 = 0200			vdslst	equ $0200
+    20 = 0230			sdlstl	equ $0230
+    21 = 02F4			chbas	equ $02f4
+    22 = D404			hscrol	equ $d404
+    23 = D40A			wsync	equ $d40a
+    24 = D40B			vcount	equ $d40b
+    25
+    26 					org $600
+    27
+    28 					; set display list
+    29 FFFF> 0600-065E> A9 56		lda #<dlist
+    30 0602 8D 30 02			sta sdlstl
+    31 0605 A9 06			lda #>dlist
+    32 0607 8D 31 02			sta sdlstl+1
+    33
+    34 					; initialize text pointer to the first character of scroll text
+    35 060A A9 00			lda <text
+    36 060C 85 C0			sta txtptr
+    37 060E A9 09			lda >text
+    38 0610 85 C1			sta txtptr+1
+    39
+    40 					; set character set
+    41 0612 A9 70			lda #>fonts
+    42 0614 8D F4 02			sta chbas
+    43
+    44 0617 A2 03			ldx #$03
+    45 0619 8E 04 D4		main	stx hscrol
+    46
+    47 					; delay
+    48 061C A5 14			lda rtclok+2
+    49 061E C5 14		delay	cmp rtclok+2
+    50 0620 F0 FC			beq delay
+    51
+    52 0622 CA				dex
+    53 0623 10 F4			bpl main
+    54 0625 A2 03			ldx #$03
+    55 0627 8E 04 D4			stx hscrol
+    56
+    57 					; move data in viewport one character left
+    58 062A A0 00			ldy #$00
+    59 062C B9 01 40		move	lda video+1,y
+    60 062F 99 00 40			sta video,y
+    61 0632 C8				iny
+    62 0633 C0 2B			cpy #$2b
+    63 0635 D0 F5			bne move
+    64
+    65 					; put new character of scroll text
+    66 0637 A0 00			ldy #$00
+    67 0639 B1 C0			lda (txtptr),y
+    68 063B D0 0A			bne skip1	; zero in 'text' means the end of scroll
+    69
+    70 					; initialize text pointer to the first character of scroll text
+    71 063D A9 00			lda <text
+    72 063F 85 C0			sta txtptr
+    73 0641 A9 09			lda >text
+    74 0643 85 C1			sta txtptr+1
+    75 0645 B1 C0			lda (txtptr),y	
+    76
+    77 0647 38			skip1	sec
+    78 0648 E9 01			sbc #$01
+    79 064A 8D 2B 40			sta video+$2b
+    80
+    81 					; point to the next character of scroll text
+    82 064D E6 C0			inc txtptr
+    83 064F D0 02			bne skip2
+    84 0651 E6 C1			inc txtptr+1
+    85 0653			skip2
+    86 0653 4C 19 06			jmp main
+    87
+    88
+    89 					; display list
+    90 0656 70 70 70		dlist	.byte $70, $70, $70		; 24 blank lines
+    91 0659 52				.byte $02 | $40 | $10		; mode 2 + LMS + HSCROLL
+    92 065A 00 40			.byte $00, $40			; screen address
+    93 065C 41				.byte $41			; jump and wait for VBLANK
+    94 065D 56 06			.byte <dlist, >dlist		; jump to this address
+    95
+    96
+    97 					; data comes from "1x1ScrollData3.json"
+    98 065F				icl '1X1DTA3.ASM'
+     1 				; "Scroll Packer" v0.1, 2020-07-16 22:28:43, "1x1ScrollData3\1x1ScrollData3.json"
+     2
+     3 065F				org $900
+     4
+     5 				; scroll text, length: 103, unique characters: 58
+     6 0900-0966> 01 02 03 04 + text	.byte $01, $02, $03, $04, $05, $06, $07, $04	;  Hey guy
+     7 0908 08 09 05 0A 0B 0C + 	.byte $08, $09, $05, $0a, $0b, $0c, $08, $05	; s! It's 
+     8 0910 0B 0D 03 05 0E 03 + 	.byte $0b, $0d, $03, $05, $0e, $03, $0f, $10	; the demo
+     9 0918 05 10 11 05 12 13 + 	.byte $05, $10, $11, $05, $12, $13, $14, $15	;  of "SCR
+    10 0920 16 17 17 05 18 19 + 	.byte $16, $17, $17, $05, $18, $19, $14, $1a	; OLL PACK
+    11 0928 1B 15 12 1C 1C 1C + 	.byte $1b, $15, $12, $1c, $1c, $1c, $01, $1d	; ER"... G
+    12 0930 1E 1F 20 1E 21 22 + 	.byte $1e, $1f, $20, $1e, $21, $22, $23, $24	; żegżółka
+    13 0938 01 1D 25 26 1D 25 + 	.byte $01, $1d, $25, $26, $1d, $25, $27, $28	;  GŻEGŻÓŁ
+    14 0940 29 2A 01 2B 2C 03 + 	.byte $29, $2a, $01, $2b, $2c, $03, $06, $2c	; KA Gżegż
+    15 0948 2D 2E 2F 30 31 2B + 	.byte $2d, $2e, $2f, $30, $31, $2b, $32, $1b	; ółka GŻE
+    16 0950 2B 32 33 34 1A 19 + 	.byte $2b, $32, $33, $34, $1a, $19, $31, $31	; GŻÓŁKA  
+    17 0958 31 35 1F 01 36 01 + 	.byte $31, $35, $1f, $01, $36, $01, $37, $38	;  We ♥ yo
+    18 0960 39 3A 01 01 01 01 + 	.byte $39, $3a, $01, $01, $01, $01, $00	; u!    ZERO
+    19 0967			textend
+    20
+    21 0967				org $7000
+    22
+    23 				; fonts data
+    24 7000-71CF> 00 00 00 00 + fonts	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {system} 0_0
+    25 7008 00 42 42 7E 42 42 + 	.byte $00, $42, $42, $7e, $42, $42, $42, $00	; "H" {simple} 0_0
+    26 7010 00 00 3C 42 7E 40 + 	.byte $00, $00, $3c, $42, $7e, $40, $3c, $00	; "e" {simple} 0_0
+    27 7018 00 00 42 42 42 3E + 	.byte $00, $00, $42, $42, $42, $3e, $02, $7c	; "y" {simple} 0_0
+    28 7020 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {simple} 0_0
+    29 7028 00 00 3E 42 42 3E + 	.byte $00, $00, $3e, $42, $42, $3e, $02, $7c	; "g" {simple} 0_0
+    30 7030 00 00 42 42 42 42 + 	.byte $00, $00, $42, $42, $42, $42, $3e, $00	; "u" {simple} 0_0
+    31 7038 00 00 3E 40 3C 02 + 	.byte $00, $00, $3e, $40, $3c, $02, $7c, $00	; "s" {simple} 0_0
+    32 7040 00 10 10 10 10 00 + 	.byte $00, $10, $10, $10, $10, $00, $10, $00	; "!" {simple} 0_0
+    33 7048 00 3E 08 08 08 08 + 	.byte $00, $3e, $08, $08, $08, $08, $3e, $00	; "I" {simple} 0_0
+    34 7050 00 10 7C 10 10 10 + 	.byte $00, $10, $7c, $10, $10, $10, $0e, $00	; "t" {simple} 0_0
+    35 7058 00 10 10 10 00 00 + 	.byte $00, $10, $10, $10, $00, $00, $00, $00	; "'" {simple} 0_0
+    36 7060 00 40 40 7C 42 42 + 	.byte $00, $40, $40, $7c, $42, $42, $42, $00	; "h" {simple} 0_0
+    37 7068 00 02 02 3E 42 42 + 	.byte $00, $02, $02, $3e, $42, $42, $3e, $00	; "d" {simple} 0_0
+    38 7070 00 00 62 55 49 49 + 	.byte $00, $00, $62, $55, $49, $49, $41, $00	; "m" {simple} 0_0
+    39 7078 00 00 3C 42 42 42 + 	.byte $00, $00, $3c, $42, $42, $42, $3c, $00	; "o" {simple} 0_0
+    40 7080 00 0E 10 7C 10 10 + 	.byte $00, $0e, $10, $7c, $10, $10, $10, $00	; "f" {simple} 0_0
+    41 7088 00 24 24 24 00 00 + 	.byte $00, $24, $24, $24, $00, $00, $00, $00	; """ {simple} 0_0
+    42 7090 00 3C 40 3C 02 02 + 	.byte $00, $3c, $40, $3c, $02, $02, $3c, $00	; "S" {simple} 0_0
+    43 7098 00 3C 42 40 40 42 + 	.byte $00, $3c, $42, $40, $40, $42, $3c, $00	; "C" {simple} 0_0
+    44 70A0 00 7C 42 42 7C 44 + 	.byte $00, $7c, $42, $42, $7c, $44, $42, $00	; "R" {simple} 0_0
+    45 70A8 00 3C 42 42 42 42 + 	.byte $00, $3c, $42, $42, $42, $42, $3c, $00	; "O" {simple} 0_0
+    46 70B0 00 40 40 40 40 40 + 	.byte $00, $40, $40, $40, $40, $40, $7e, $00	; "L" {simple} 0_0
+    47 70B8 00 7C 42 42 7C 40 + 	.byte $00, $7c, $42, $42, $7c, $40, $40, $00	; "P" {simple} 0_0
+    48 70C0 00 18 24 42 42 7E + 	.byte $00, $18, $24, $42, $42, $7e, $42, $00	; "A" {simple} 0_0
+    49 70C8 00 42 44 48 58 64 + 	.byte $00, $42, $44, $48, $58, $64, $42, $00	; "K" {simple} 0_0
+    50 70D0 00 7E 40 7C 40 40 + 	.byte $00, $7e, $40, $7c, $40, $40, $7e, $00	; "E" {simple} 0_0
+    51 70D8 00 00 00 00 00 18 + 	.byte $00, $00, $00, $00, $00, $18, $18, $00	; "." {system} 0_0
+    52 70E0 00 3E 60 60 6E 66 + 	.byte $00, $3e, $60, $60, $6e, $66, $3e, $00	; "G" {system} 0_0
+    53 70E8 18 00 7E 0C 18 30 + 	.byte $18, $00, $7e, $0c, $18, $30, $7e, $00	; "ż" {system Polish} 0_0
+    54 70F0 00 00 3C 66 7E 60 + 	.byte $00, $00, $3c, $66, $7e, $60, $3c, $00	; "e" {system} 0_0
+    55 70F8 00 00 3E 66 66 3E + 	.byte $00, $00, $3e, $66, $66, $3e, $06, $7c	; "g" {system} 0_0
+    56 7100 0C 18 3C 66 66 66 + 	.byte $0c, $18, $3c, $66, $66, $66, $3c, $00	; "ó" {system Polish} 0_0
+    57 7108 00 38 18 1C 38 18 + 	.byte $00, $38, $18, $1c, $38, $18, $3c, $00	; "ł" {system Polish} 0_0
+    58 7110 00 60 60 6C 78 6C + 	.byte $00, $60, $60, $6c, $78, $6c, $66, $00	; "k" {system} 0_0
+    59 7118 00 00 3C 06 3E 66 + 	.byte $00, $00, $3c, $06, $3e, $66, $3e, $00	; "a" {system} 0_0
+    60 7120 00 7E 0C 7E 30 60 + 	.byte $00, $7e, $0c, $7e, $30, $60, $7e, $00	; "Ż" {system Polish} 0_0
+    61 7128 00 7E 60 7C 60 60 + 	.byte $00, $7e, $60, $7c, $60, $60, $7e, $00	; "E" {system} 0_0
+    62 7130 18 3C 66 66 66 66 + 	.byte $18, $3c, $66, $66, $66, $66, $3c, $00	; "Ó" {system Polish} 0_0
+    63 7138 00 60 68 78 70 60 + 	.byte $00, $60, $68, $78, $70, $60, $7e, $00	; "Ł" {system Polish} 0_0
+    64 7140 00 66 6C 78 78 6C + 	.byte $00, $66, $6c, $78, $78, $6c, $66, $00	; "K" {system} 0_0
+    65 7148 00 18 3C 66 66 7E + 	.byte $00, $18, $3c, $66, $66, $7e, $66, $00	; "A" {system} 0_0
+    66 7150 00 3E 40 40 4E 42 + 	.byte $00, $3e, $40, $40, $4e, $42, $3e, $00	; "G" {simple} 0_0
+    67 7158 18 00 7E 04 08 10 + 	.byte $18, $00, $7e, $04, $08, $10, $7e, $00	; "ż" {simple Polish} 0_0
+    68 7160 04 08 3C 42 42 42 + 	.byte $04, $08, $3c, $42, $42, $42, $3c, $00	; "ó" {simple Polish} 0_0
+    69 7168 00 30 10 18 30 10 + 	.byte $00, $30, $10, $18, $30, $10, $38, $00	; "ł" {simple Polish} 0_0
+    70 7170 00 40 44 48 70 48 + 	.byte $00, $40, $44, $48, $70, $48, $44, $00	; "k" {simple} 0_0
+    71 7178 00 00 3C 02 3E 42 + 	.byte $00, $00, $3c, $02, $3e, $42, $3e, $00	; "a" {simple} 0_0
+    72 7180 00 00 00 00 00 00 + 	.byte $00, $00, $00, $00, $00, $00, $00, $00	; " " {simple Polish} 0_0
+    73 7188 00 7E 04 7E 10 20 + 	.byte $00, $7e, $04, $7e, $10, $20, $7e, $00	; "Ż" {simple Polish} 0_0
+    74 7190 18 3C 42 42 42 42 + 	.byte $18, $3c, $42, $42, $42, $42, $3c, $00	; "Ó" {simple Polish} 0_0
+    75 7198 00 40 40 50 60 40 + 	.byte $00, $40, $40, $50, $60, $40, $7e, $00	; "Ł" {simple Polish} 0_0
+    76 71A0 00 63 63 6B 7F 77 + 	.byte $00, $63, $63, $6b, $7f, $77, $63, $00	; "W" {system} 0_0
+    77 71A8 00 36 7F 7F 3E 1C + 	.byte $00, $36, $7f, $7f, $3e, $1c, $08, $00	; "♥" {system} 0_0
+    78 71B0 00 00 66 66 66 3E + 	.byte $00, $00, $66, $66, $66, $3e, $0c, $78	; "y" {system} 0_0
+    79 71B8 00 00 3C 66 66 66 + 	.byte $00, $00, $3c, $66, $66, $66, $3c, $00	; "o" {system} 0_0
+    80 71C0 00 00 66 66 66 66 + 	.byte $00, $00, $66, $66, $66, $66, $3e, $00	; "u" {system} 0_0
+    81 71C8 00 18 18 18 18 00 + 	.byte $00, $18, $18, $18, $18, $00, $18, $00	; "!" {system} 0_0
+    82 71D0			fontsen
